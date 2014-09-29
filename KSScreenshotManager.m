@@ -122,41 +122,15 @@ CGImageRef UIGetScreenImage(); //private API for getting an image of the entire 
 - (void)saveScreenshot:(NSString *)name includeStatusBar:(BOOL)includeStatusBar
 {
     //Get image with status bar cropped out
-    BOOL isRetina = [[UIScreen mainScreen] scale] != 1.0f;
-    CGFloat StatusBarHeight = [[UIScreen mainScreen] scale] * 20;
-    CGImageRef CGImage = UIGetScreenImage();
+    CGFloat screenScale = [[UIScreen mainScreen] scale];
+    BOOL isRetina = screenScale != 1.0f;
+    UIWindow *mainWindow = [[UIApplication sharedApplication] keyWindow];
+    UIGraphicsBeginImageContextWithOptions(mainWindow.bounds.size, NO, screenScale);
+    [mainWindow drawViewHierarchyInRect:mainWindow.bounds afterScreenUpdates:YES];
+    UIImage *image = UIGraphicsGetImageFromCurrentImageContext();
+    UIGraphicsEndImageContext();
     UIInterfaceOrientation orientation = [[UIApplication sharedApplication] statusBarOrientation];
     BOOL isPortrait = UIInterfaceOrientationIsPortrait(orientation);
-    CGRect imageRect;
-
-    // remove alpha since the new itunes connect doesn't like it
-    // http://stackoverflow.com/questions/21416358/remove-alpha-channel-from-uiimage
-    // http://stackoverflow.com/questions/9920836/color-distortion-in-cgimagecreate
-    CFDataRef theData = CGDataProviderCopyData(CGImageGetDataProvider(CGImage));
-    UInt8 *pixelData = (UInt8 *)CFDataGetBytePtr(theData);
-    CGContextRef bitmapContext = CGBitmapContextCreate(pixelData,
-                                                       CGImageGetWidth(CGImage),
-                                                       CGImageGetHeight(CGImage),
-                                                       CGImageGetBitsPerComponent(CGImage),
-                                                       CGImageGetBytesPerRow(CGImage),
-                                                       CGImageGetColorSpace(CGImage),
-                                                       kCGBitmapByteOrder32Little | kCGImageAlphaNoneSkipFirst
-                                                       );
-    CGImage = CGBitmapContextCreateImage(bitmapContext);
-    CGContextRelease(bitmapContext);
-    CFRelease(theData);
-
-    if (!includeStatusBar) {
-        if (isPortrait) {
-            imageRect = CGRectMake(0, StatusBarHeight, CGImageGetWidth(CGImage), CGImageGetHeight(CGImage) - StatusBarHeight);
-        } else {
-            imageRect = CGRectMake(StatusBarHeight, 0, CGImageGetWidth(CGImage) - StatusBarHeight, CGImageGetHeight(CGImage));
-        }
-        
-        CGImage = (__bridge CGImageRef)CFBridgingRelease(CGImageCreateWithImageInRect(CGImage, imageRect));
-    }
-    
-    UIImage *image = [UIImage imageWithCGImage:CGImage];
     
     //Rotate image to match orientation
     if (!isPortrait) {
@@ -192,7 +166,7 @@ CGImageRef UIGetScreenImage(); //private API for getting an image of the entire 
     }
     
     NSString *devicePrefix = nil;
-    NSString *screenDensity = isRetina ? [NSString stringWithFormat:@"@%.0fx", [[UIScreen mainScreen] scale]] : @"";
+    NSString *screenDensity = isRetina ? [NSString stringWithFormat:@"@%.0fx", screenScale] : @"";
     
     if (UI_USER_INTERFACE_IDIOM() == UIUserInterfaceIdiomPhone) {
         CGFloat screenHeight;
